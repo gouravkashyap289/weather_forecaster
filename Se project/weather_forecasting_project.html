@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Weather Forecast</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .weather-card {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #4facfe;
+    }
+
+    button {
+      padding: 12px 20px;
+      background-color: #0088ff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background-color: #0066cc;
+    }
+
+    .weather-info {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .city-name {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: #222;
+    }
+
+    .temperature {
+      font-size: 3.5rem;
+      font-weight: bold;
+      color: #0088ff;
+      margin: 10px 0;
+    }
+
+    .condition {
+      font-size: 1.1rem;
+      color: #555;
+      margin-bottom: 20px;
+    }
+
+    .details {
+      display: flex;
+      justify-content: space-around;
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+      color: #444;
+      font-size: 0.95rem;
+    }
+
+    .error {
+      color: #d9534f;
+      margin-top: 15px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="weather-card">
+    <h1>Weather Forecast</h1>
+    
+    <div class="search-box">
+      <input type="text" id="cityInput" placeholder="Enter city name (e.g., Jaipur)" />
+      <button onclick="getWeather()">Search</button>
+    </div>
+
+    <p class="error" id="errorMsg">City not found. Please try again.</p>
+
+    <div class="weather-info" id="weatherInfo">
+      <div class="city-name" id="cityName">--</div>
+      <div class="temperature" id="temperature">--°C</div>
+      <div class="condition" id="condition">--</div>
+      
+      <div class="details">
+        <div>
+          <strong>Humidity</strong>
+          <p id="humidity">--%</p>
+        </div>
+        <div>
+          <strong>Wind Speed</strong>
+          <p id="windSpeed">-- km/h</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Allow pressing "Enter" to trigger search
+    document.getElementById("cityInput").addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        getWeather();
+      }
+    });
+
+    async function getWeather() {
+      const city = document.getElementById("cityInput").value.trim();
+      const weatherInfo = document.getElementById("weatherInfo");
+      const errorMsg = document.getElementById("errorMsg");
+
+      if (!city) return;
+
+      errorMsg.style.display = "none";
+
+      try {
+        // Step 1: Convert city name to Latitude & Longitude using Open-Meteo Geocoding API
+        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`;
+        const geoResponse = await fetch(geoUrl);
+        const geoData = await geoResponse.json();
+
+        if (!geoData.results || geoData.results.length === 0) {
+          weatherInfo.style.display = "none";
+          errorMsg.style.display = "block";
+          return;
+        }
+
+        const { latitude, longitude, name, country } = geoData.results[0];
+
+        // Step 2: Fetch current weather using the coordinates
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m`;
+        const weatherResponse = await fetch(weatherUrl);
+        const weatherData = await weatherResponse.json();
+
+        const current = weatherData.current;
+
+        // Step 3: Update UI elements
+        document.getElementById("cityName").textContent = `${name}, ${country}`;
+        document.getElementById("temperature").textContent = `${Math.round(current.temperature_2m)}°C`;
+        document.getElementById("condition").textContent = getWeatherDescription(current.weather_code);
+        document.getElementById("humidity").textContent = `${current.relative_humidity_2m}%`;
+        document.getElementById("windSpeed").textContent = `${current.wind_speed_10m} km/h`;
+
+        weatherInfo.style.display = "block";
+
+      } catch (error) {
+        weatherInfo.style.display = "none";
+        errorMsg.textContent = "Failed to fetch weather data.";
+        errorMsg.style.display = "block";
+      }
+    }
+
+    // Helper function to convert WMO weather codes into readable text
+    function getWeatherDescription(code) {
+      const codes = {
+        0: "Clear sky ☀️",
+        1: "Mainly clear 🌤️",
+        2: "Partly cloudy ⛅",
+        3: "Overcast ☁️",
+        45: "Foggy 🌫️",
+        48: "Depositing rime fog 🌫️",
+        51: "Light drizzle 🌦️",
+        61: "Slight rain 🌧️",
+        63: "Moderate rain 🌧️",
+        65: "Heavy rain 🌧️",
+        71: "Slight snow ❄️",
+        80: "Rain showers 🌦️",
+        95: "Thunderstorm ⛈️"
+      };
+      return codes[code] || "Variable conditions 🌍";
+    }
+  </script>
+
+</body>
+</html>
